@@ -4,36 +4,60 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.net.ServerSocket;
 import java.net.Socket;
 import java.sql.SQLException;
 
-public class ClientHandler implements Observer, Runnable {
-    private Socket client;
+import Socket.SocketConnector;
+
+public class ClientHandler implements Observer, Runnable, SocketConnector {
     private Server server;
     private String clientId;
+    private String feedback;
+    private BufferedReader bufferedReader;
+    private Socket socket;
     private PrintWriter printWriter;
-    public ClientHandler(Socket client, Server server) {
-        this.client = client;
+    public ClientHandler(Socket client, Server server) throws IOException {
+        this.socket = client;
         this.server = server;
-}
+        printWriter = new PrintWriter(client.getOutputStream());
+        InputStreamReader inputStreamReader = new InputStreamReader(socket.getInputStream());
+        bufferedReader = new BufferedReader(inputStreamReader);
+        clientId = bufferedReader.readLine();
+        System.out.println("New client added. Client ID: "+clientId);
+    }
 
     @Override
     public void run() {
         try {
-            InputStreamReader inputStreamReader = new InputStreamReader(client.getInputStream());
-            printWriter = new PrintWriter(client.getOutputStream());
-            BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
-            clientId = bufferedReader.readLine();
             addClientToDatabase();
-            String feedback;
-            label:
-            while (true) {
-                String message = bufferedReader.readLine();
+            setClientNotWorking();
+            Thread receiver = new Thread(() -> {
+                try {
+                    receiveMessage();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+            receiver.start();
+
+            Thread sender = new Thread(this::sendMessage);
+            sender.start();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+    }
+    @Override
+    public void receiveMessage() throws IOException {
+
+        while(!socket.isClosed()){
+            String message = bufferedReader.readLine();
+            if(message != null){
                 switch (message) {
                     case "end":
                         server.getServerSocket().close();
-                        break label;
+                        break;
                     case "first":
                         feedback = server.getFirstProductManufacture().createProduct().showProduct();
                         break;
@@ -44,18 +68,24 @@ public class ClientHandler implements Observer, Runnable {
                         feedback = "Cannot find product";
                         break;
                 }
+            }
+        }
+    }
+    @Override
+    public void sendMessage(){
+        while(!socket.isClosed()){
+            if(feedback!=null){
                 for (Observer observer: server.getObservers()) {
                     observer.update();
                 }
                 printWriter.println(feedback);
                 printWriter.flush();
+                feedback = null;
             }
-            setClientNotWorking();
-        } catch (IOException | SQLException e) {
-            e.printStackTrace();
         }
-
     }
+
+
     private void addClientToDatabase() throws SQLException {
         String query = "INSERT INTO clients VALUES(0, \""+clientId+"\", now(), true);";
         server.getDatabaseConnector().execute(query);
@@ -67,6 +97,12 @@ public class ClientHandler implements Observer, Runnable {
 
     @Override
     public void update() {
+        printWriter.println("Server active");
+        printWriter.flush();
+    }
 
+    @Override
+    public void close() throws IOException {
+        socket.close();
     }
 }

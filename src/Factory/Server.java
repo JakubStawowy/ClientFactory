@@ -9,6 +9,7 @@ import java.net.Socket;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -27,11 +28,30 @@ public class Server {
             System.out.println("Database connected");
             serverSocket = new ServerSocket(port);
             System.out.println("Server on");
+            Thread listener = new Thread(() -> {
+                try{
+                    Scanner scanner = new Scanner(System.in);
+                    while (!serverSocket.isClosed()){
+                        String command = scanner.nextLine().toLowerCase();
+                        if(command.equals("end") || command.equals("quit")){
+                            serverSocket.close();
+                            for(Observer observer: observers)
+                                observer.close();
+                        }
+                        else if(command.equals("help"))
+                            System.out.println("To close connection, type help or quit");
+                        else
+                            System.out.println(command+" - unrecognized command");
+                    }
+                }catch (IOException e){
+                    e.printStackTrace();
+                }
+            });
+            listener.start();
             while (!serverSocket.isClosed()) {
                 Socket client = serverSocket.accept();
                 ClientHandler clientHandler = new ClientHandler(client, this);
                 observers.add(clientHandler);
-                System.out.println("New client added");
                 pool.execute(clientHandler);
             }
             System.out.println("Koniec");
