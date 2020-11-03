@@ -1,8 +1,5 @@
 package Factory;
 
-import Client.Client;
-
-import javax.xml.crypto.Data;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -22,24 +19,24 @@ public class Server {
     private Manufacture firstProductManufacture = new FirstProductManufacture();
     private Manufacture secondProductManufacture = new SecondProductManufacture();
     private List<Observer> observers = new ArrayList<>();
-    public Server() {
-        try {
+    public Server() throws SQLException, IOException {
             databaseConnector = DatabaseConnector.getInstance();
             System.out.println("Database connected");
             serverSocket = new ServerSocket(port);
             System.out.println("Server on");
+
             Thread listener = new Thread(() -> {
                 try{
                     Scanner scanner = new Scanner(System.in);
                     while (!serverSocket.isClosed()){
                         String command = scanner.nextLine().toLowerCase();
                         if(command.equals("end") || command.equals("quit")){
-                            serverSocket.close();
                             for(Observer observer: observers)
                                 observer.close();
+                            serverSocket.close();
                         }
                         else if(command.equals("help"))
-                            System.out.println("To close connection, type help or quit");
+                            System.out.println("To close connection, type end or quit");
                         else
                             System.out.println(command+" - unrecognized command");
                     }
@@ -48,17 +45,18 @@ public class Server {
                 }
             });
             listener.start();
+
             while (!serverSocket.isClosed()) {
-                Socket client = serverSocket.accept();
-                ClientHandler clientHandler = new ClientHandler(client, this);
-                observers.add(clientHandler);
-                pool.execute(clientHandler);
+                try{
+                    Socket client = serverSocket.accept();
+                    ClientHandler clientHandler = new ClientHandler(client, this);
+                    observers.add(clientHandler);
+                    pool.execute(clientHandler);
+                }catch (IOException e){
+                    System.out.println(e.getMessage());
+                }
             }
-            System.out.println("Koniec");
             databaseConnector.disconnect();
-        } catch (SQLException | IOException e) {
-            System.out.println(e.getMessage());
-        }
     }
     public ServerSocket getServerSocket(){
         return serverSocket;
@@ -76,6 +74,10 @@ public class Server {
         return observers;
     }
     public static void main(String[] args){
+        try{
             new Server();
+        }catch (SQLException | IOException e){
+            e.printStackTrace();
+        }
     }
 }

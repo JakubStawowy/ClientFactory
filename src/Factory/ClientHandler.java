@@ -5,17 +5,14 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.net.SocketException;
 import java.sql.SQLException;
-
 import Socket.SocketConnector;
-
-public class ClientHandler implements Observer, Runnable, SocketConnector {
+public class ClientHandler extends SocketConnector implements Observer, Runnable {
     private Server server;
     private String clientId;
     private String feedback;
     private BufferedReader bufferedReader;
-    private Socket socket;
-    private PrintWriter printWriter;
     public ClientHandler(Socket client, Server server) throws IOException {
         this.socket = client;
         this.server = server;
@@ -52,22 +49,23 @@ public class ClientHandler implements Observer, Runnable, SocketConnector {
     public void receiveMessage() throws IOException {
 
         while(!socket.isClosed()){
-            String message = bufferedReader.readLine();
-            if(message != null){
-                switch (message) {
-                    case "end":
-                        server.getServerSocket().close();
-                        break;
-                    case "first":
-                        feedback = server.getFirstProductManufacture().createProduct().showProduct();
-                        break;
-                    case "second":
-                        feedback = server.getSecondProductManufacture().createProduct().showProduct();
-                        break;
-                    default:
-                        feedback = "Cannot find product";
-                        break;
+            try{
+                String message = bufferedReader.readLine();
+                if(message != null){
+                    switch (message) {
+                        case "first":
+                            feedback = server.getFirstProductManufacture().createProduct().showProduct();
+                            break;
+                        case "second":
+                            feedback = server.getSecondProductManufacture().createProduct().showProduct();
+                            break;
+                        default:
+                            feedback = "Cannot find product";
+                            break;
+                    }
                 }
+            }catch (SocketException ignored){
+
             }
         }
     }
@@ -78,8 +76,7 @@ public class ClientHandler implements Observer, Runnable, SocketConnector {
                 for (Observer observer: server.getObservers()) {
                     observer.update();
                 }
-                printWriter.println(feedback);
-                printWriter.flush();
+                sendMessage(feedback);
                 feedback = null;
             }
         }
@@ -87,22 +84,21 @@ public class ClientHandler implements Observer, Runnable, SocketConnector {
 
 
     private void addClientToDatabase() throws SQLException {
-        String query = "INSERT INTO clients VALUES(0, \""+clientId+"\", now(), true);";
+        String query = "INSERT INTO client VALUES(0, \""+clientId+"\", now(), true);";
         server.getDatabaseConnector().execute(query);
     }
     private void setClientNotWorking() throws SQLException {
-        String query = "UPDATE clients SET working=false WHERE CID=\""+clientId+"\";";
+        String query = "UPDATE client SET working=false WHERE CID=\""+clientId+"\";";
         server.getDatabaseConnector().execute(query);
     }
 
     @Override
     public void update() {
-        printWriter.println("Server active");
-        printWriter.flush();
+        sendMessage("Server active");
     }
 
     @Override
-    public void close() throws IOException {
-        socket.close();
+    public void close() {
+        sendMessage("end");
     }
 }

@@ -19,11 +19,6 @@ public class DatabaseConnector {
             instance = new DatabaseConnector("jdbc:mysql://localhost:3306/FactoryDB", "root", "");
         return instance;
     }
-
-    public ResultSet executeQuery(String query) throws SQLException {
-        return connection.createStatement().executeQuery(query);
-    }
-
     public void execute(String query) throws SQLException{
         connection.createStatement().execute(query);
     }
