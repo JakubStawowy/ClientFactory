@@ -10,7 +10,7 @@ public abstract class SocketConnector {
     protected PrintWriter printWriter;
     protected abstract void sendMessage() throws IOException;
     protected abstract void receiveMessage() throws IOException;
-    protected void sendMessage(String message){
+    public void sendMessage(String message){
         printWriter.println(message);
         printWriter.flush();
     }

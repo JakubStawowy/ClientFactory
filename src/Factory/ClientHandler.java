@@ -91,7 +91,10 @@ public class ClientHandler extends SocketConnector implements Observer, Runnable
         String query = "UPDATE client SET working=false WHERE CID=\""+clientId+"\";";
         server.getDatabaseConnector().execute(query);
     }
-
+    @Override
+    public String getFeedback(){
+        return feedback;
+    }
     @Override
     public void update() {
         sendMessage("Server active");

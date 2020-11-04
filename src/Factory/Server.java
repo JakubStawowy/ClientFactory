@@ -10,7 +10,7 @@ import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class Server {
+public class Server extends Thread {
     private ServerSocket serverSocket;
     private DatabaseConnector databaseConnector;
     private final int port = 4999;
@@ -19,48 +19,54 @@ public class Server {
     private Manufacture firstProductManufacture = new FirstProductManufacture();
     private Manufacture secondProductManufacture = new SecondProductManufacture();
     private List<Observer> observers = new ArrayList<>();
-    public Server() throws SQLException, IOException {
+
+    @Override
+    public void run() {
+
+        try {
             databaseConnector = DatabaseConnector.getInstance();
-            System.out.println("Database connected");
-            serverSocket = new ServerSocket(port);
-            System.out.println("Server on");
 
-            Thread listener = new Thread(() -> {
-                try{
-                    Scanner scanner = new Scanner(System.in);
-                    while (!serverSocket.isClosed()){
-                        String command = scanner.nextLine().toLowerCase();
-                        if(command.equals("end") || command.equals("quit")){
-                            for(Observer observer: observers)
-                                observer.close();
-                            serverSocket.close();
-                        }
-                        else if(command.equals("help"))
-                            System.out.println("To close connection, type end or quit");
-                        else
-                            System.out.println(command+" - unrecognized command");
+        System.out.println("Database connected");
+        serverSocket = new ServerSocket(port);
+        System.out.println("Server on");
+
+        Thread listener = new Thread(() -> {
+            try{
+                Scanner scanner = new Scanner(System.in);
+                while (!serverSocket.isClosed()){
+                    String command = scanner.nextLine().toLowerCase();
+                    if(command.equals("end") || command.equals("quit")){
+                        for(Observer observer: observers)
+                            observer.close();
+                        serverSocket.close();
                     }
-                }catch (IOException e){
-                    e.printStackTrace();
+                    else if(command.equals("help"))
+                        System.out.println("To close connection, type end or quit");
+                    else
+                        System.out.println(command+" - unrecognized command");
                 }
-            });
-            listener.start();
-
-            while (!serverSocket.isClosed()) {
-                try{
-                    Socket client = serverSocket.accept();
-                    ClientHandler clientHandler = new ClientHandler(client, this);
-                    observers.add(clientHandler);
-                    pool.execute(clientHandler);
-                }catch (IOException e){
-                    System.out.println(e.getMessage());
-                }
+            }catch (IOException e){
+                e.printStackTrace();
             }
-            databaseConnector.disconnect();
+        });
+        listener.start();
+
+        while (!serverSocket.isClosed()) {
+            try{
+                Socket client = serverSocket.accept();
+                ClientHandler clientHandler = new ClientHandler(client, this);
+                observers.add(clientHandler);
+                pool.execute(clientHandler);
+            }catch (IOException e){
+                System.out.println(e.getMessage());
+            }
+        }
+        databaseConnector.disconnect();
+        } catch (SQLException | IOException e) {
+            e.printStackTrace();
+        }
     }
-    public ServerSocket getServerSocket(){
-        return serverSocket;
-    }
+
     public DatabaseConnector getDatabaseConnector(){
         return this.databaseConnector;
     }
@@ -70,14 +76,19 @@ public class Server {
     public Manufacture getSecondProductManufacture(){
         return secondProductManufacture;
     }
+    public void closeServer(){
+        try {
+            serverSocket.close();
+            databaseConnector.disconnect();
+        } catch (SQLException | IOException e) {
+            e.printStackTrace();
+        }
+    }
     public List<Observer> getObservers(){
         return observers;
     }
     public static void main(String[] args){
-        try{
-            new Server();
-        }catch (SQLException | IOException e){
-            e.printStackTrace();
-        }
+        Thread server = new Server();
+        server.start();
     }
 }
